@@ -104,8 +104,6 @@ def poisson_integration(mus, known_vals, positions):
             max_k += 10
         pmfs.append(pmf)
 
-    probabilities = probability_array_gen(pmfs, positions)
-
 #Here is where we are struggling:
 #Trying to create joint dist.
 #Want something that does this but quicker:
@@ -116,10 +114,11 @@ def poisson_integration(mus, known_vals, positions):
 
     pmfs = [[.25,.20,.20,.15],[.24,.21,.19,.16],[.23,.42,.35]] #temporary pmfs list
 
+    probabilities = probability_array_gen(pmfs, positions)
+
 #Attempts
     # np.broadcast_to()
     # temp = np.broadcast(pmfs[i], probabilities[:,:])
-    # probabilities = np.empty(probabilities.shape)
     # print("Here",([p] for p in pmfs))
     # probabilities = einsum()
     # probabilities.flat = [u*v for (u,v) in temp] #can't multiply more than two? How to automatically fill in generation func
@@ -127,14 +126,9 @@ def poisson_integration(mus, known_vals, positions):
     # print("Probability shape", probabilities.shape)
     # probabilities = np.tile()
 
-    temp = np.array(np.meshgrid([p for p in pmfs[0]],[p for p in pmfs[1]],[p for p in pmfs[2]])).T.reshape(-1,4,4,3)
-    print((p for p in temp))
-    print(temp)
-    # temp.reshape(4,4,3,4)
-    # print("^ before multiplying. v after multiplying")
-    print("shape", temp.shape)
-    print(np.tensordot(temp[0],temp[1], axes=([1,0],[0,1])))
-    # print(np.prod(temp, axis = 1))
+    print("joint_prob_one", joint_prob_one(probabilities, pmfs))
+
+    print("joint_prob_two", joint_prob_two(probabilities, pmfs))
 
     print(probabilities)
 
@@ -146,6 +140,27 @@ def poisson_integration(mus, known_vals, positions):
 
     #Mix of tile and repeat, then reshape? maybe just to compare for right answer
     #Einstein's product
+
+def joint_prob_one(probabilities, pmfs):
+        for i in range(len(pmfs)):
+            indexing = np.zeros(len(probabilities))
+            indexing[i] = i
+            print(indexing)
+            temp1 = np.broadcast(probabilities[i,0,0,0],pmfs[i]) #how manually...
+            probabilities.flat = [u*v for (u,v) in temp1]
+            print("looped")
+        return probabilities
+
+def joint_prob_two(probabilities, pmfs):
+    temp = np.array(np.meshgrid([p for p in pmfs[0]],[p for p in pmfs[1]],[p for p in pmfs[2]])).T.reshape(-1,4,4,3)
+    print((p for p in temp))
+    print(temp)
+    # temp.reshape(4,4,3,4)
+    # print("^ before multiplying. v after multiplying")
+    print("shape", temp.shape)
+    print(np.tensordot(temp[0],temp[1], axes=([1,0],[0,1])))
+    print(np.prod(temp, axis = 1))
+
 
 positions = np.array([4,8,6])
 mu_vals= np.array([6,0,0])
