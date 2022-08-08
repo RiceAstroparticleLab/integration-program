@@ -3,6 +3,8 @@ import numpy as np
 import math
 from numba import jit
 from math import log, pi
+import xarray as xr
+import zarr
 # from ramanujan_pmf import ramanujan_pmf
 @jit(nopython=True)
 
@@ -60,7 +62,7 @@ def probability_array_gen(pmfs, positions):
     """
     dimension_of_grid = ([len(p) for p in pmfs]) #first dimension, to start
     dimension_of_grid.append(len(positions))
-    probabilities = np.ones((dimension_of_grid))
+    probabilities = zarr.ones((dimension_of_grid),chunks=(100,100))
     return probabilities
 
 def poisson_integration(mus, known_vals, positions):
@@ -106,87 +108,32 @@ def poisson_integration(mus, known_vals, positions):
 
 #Here is where we are struggling:
 #Trying to create joint dist.
-#Want something that does this but quicker:
-        # for k_1 in pmfs[0]:
-        #     for k_2 in pmfs[1]:
-        #         for k_3 in pmfs[2]:
-        #             probabilities[k_1,k_2,k_3] = k_1*k_2*k_3
-
-    pmfs = [[.25,.20,.20,.15],[.24,.21,.19,.16],[.23,.42,.35]] #temporary pmfs list
-
     probabilities = probability_array_gen(pmfs, positions)
-
-#Attempts
-    # np.broadcast_to()
-    # temp = np.broadcast(pmfs[i], probabilities[:,:])
-    # print("Here",([p] for p in pmfs))
-    # probabilities = einsum()
-    # probabilities.flat = [u*v for (u,v) in temp] #can't multiply more than two? How to automatically fill in generation func
-    # print("Pmfs shape", len(pmfs[0]))
-    # print("Probability shape", probabilities.shape)
-    # probabilities = np.tile()
-
-    print("joint_prob_one", joint_prob_one(probabilities, pmfs))
-
-    print("joint_prob_two", joint_prob_two(probabilities, pmfs))
-
+    temp = zarr.ones(([len(p) for p in pmfs]))
+    shapes = np.ones([len(pmfs),len(pmfs)], dtype=int)
+    np.fill_diagonal(shapes, [len(p) for p in pmfs])
+    for i in range(broken_count):
+        print(i)
+        temp *= (np.array(pmfs[i])).reshape(shapes[i])
+    print("This is what I thought the joint distribution should look like:")
+    print(temp)
+    dimension_of_grid = ([len(p) for p in pmfs]) #first dimension, to start
+    dimension_of_grid.append(len(positions))
+    probabilities *= np.expand_dims(temp,broken_count) #Doesn't work!
+    np.exp(probabilities)
+    print("Joint distribution in array with position dimension. Looks wrong.")
     print(probabilities)
-
+    # probabilities = xr.DataArray(probabilities)
 #To sum over sensor axes
+    # probabilities = xr.DataArray(probabilities)
+    # xr.IndexVariable.sum(probabilities, dim='dim_'+str(broken_count))
     for i in range(broken_count):
         probabilities = np.sum(probabilities,axis=0)
         probabilities = probabilities/np.sum(probabilities) #?
-    return np.sum(probabilities)
+    return probabilities
 
-    #Mix of tile and repeat, then reshape? maybe just to compare for right answer
-    #Einstein's product
+positions = np.array([4,5])
+mu_vals= np.array([6,0])
+known_vals = np.array([13,-1])
 
-def joint_prob_one(probabilities, pmfs):
-        for i in range(len(pmfs)):
-            indexing = np.zeros(len(probabilities))
-            indexing[i] = i
-            print(indexing)
-            temp1 = np.broadcast(probabilities[i,0,0,0],pmfs[i]) #how manually...
-            probabilities.flat = [u*v for (u,v) in temp1]
-            print("looped")
-        return probabilities
-
-def joint_prob_two(probabilities, pmfs):
-    temp = np.array(np.meshgrid([p for p in pmfs[0]],[p for p in pmfs[1]],[p for p in pmfs[2]])).T.reshape(-1,4,4,3)
-    print((p for p in temp))
-    print(temp)
-    # temp.reshape(4,4,3,4)
-    # print("^ before multiplying. v after multiplying")
-    print("shape", temp.shape)
-    print(np.tensordot(temp[0],temp[1], axes=([1,0],[0,1])))
-    print(np.prod(temp, axis = 1))
-
-
-positions = np.array([4,8,6])
-mu_vals= np.array([6,0,0])
-known_vals = np.array([13,-1,-1])
-# positions = [4,6]
-# mu_vals=[6,0]
-# known_vals=[13,-1]
-
-
-
-poisson_integration(mu_vals,known_vals,positions)
-
-# print(np.sum(grid))
-# np.random.seed(19680801)
-# # Z = np.random.rand(4, 13)
-# # Z = np.array([[0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,1,0,0,0],[0,0,0,0,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,1,0]])
-# Z = grid
-# y = np.arange(0,max_k_vals[0]+1,1,dtype=int)  # len = 11
-# x = np.arange(0,max_k_vals[1]+1,1,dtype=int)  # len = 7
-# fig, ax = plt.subplots()
-# ah = ax.pcolormesh(x, y, Z)
-# # cf = ax1.contourf(x[:-1, :-1] + dx/2.,
-# #                   y[:-1, :-1] + dy/2., z, levels=levels,
-# #                   cmap=cmap)
-# fig.colorbar(ah, label='Probability')
-# plt.title("Joint Probability Distribution of Two Broken Sensors")
-# plt.xlabel("Poisson Pmf of a Broken Sensor with Mu = 12")
-# plt.ylabel("Poisson Pmf of a Broken Sensor with Mu = 7")
-# plt.show()
+print("?",poisson_integration(mu_vals,known_vals,positions))
